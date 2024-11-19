@@ -1,0 +1,42 @@
+alias: "Notifications Tempo Rouge"
+description: "Envoie des notifications pour les jours Tempo Rouge"
+trigger:
+  # Notification la veille d'un jour rouge à 19h
+  - platform: template
+    value_template: >
+      {{ states('sensor.rte_tempo_prochaine_couleur') == 'ROUGE' and 
+         now().strftime('%H:%M') == '19:00' }}
+  # Notification le jour même à 19h
+  - platform: template
+    value_template: >
+      {{ states('sensor.rte_tempo_couleur_actuelle') == 'ROUGE' and 
+         now().strftime('%H:%M') == '19:00' }}
+action:
+  - choose:
+      # Cas 1: Notification la veille d'un jour rouge
+      - conditions:
+          - condition: template
+            value_template: "{{ states('sensor.rte_tempo_prochaine_couleur') == 'ROUGE' }}"
+        sequence:
+          - service: notify.mobile_app_galaxy_s21_fe
+            data:
+              message: "⚠️ Attention : Demain sera un jour Tempo ROUGE ! Le chauffage sera limité pendant les heures pleines (5h45-22h00)."
+              title: "Alerte Tempo Rouge - Demain"
+              data:
+                channel: "tempo_alerts"
+                importance: high
+                priority: high
+      # Cas 2: Notification le jour même à 19h
+      - conditions:
+          - condition: template
+            value_template: "{{ states('sensor.rte_tempo_couleur_actuelle') == 'ROUGE' }}"
+        sequence:
+          - service: notify.mobile_app_galaxy_s21_fe
+            data:
+              message: "🔴 Rappel : Nous sommes en jour Tempo ROUGE. Le chauffage restera en mode économique jusqu'à 22h00."
+              title: "Rappel Tempo Rouge"
+              data:
+                channel: "tempo_alerts"
+                importance: high
+                priority: high
+mode: single

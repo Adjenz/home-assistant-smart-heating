@@ -1,0 +1,75 @@
+alias: "Chambre - Détection Fenêtre Ouverte"
+description: "Détecte une chute rapide de température et coupe le chauffage"
+trigger:
+  # Déclenchement toutes les minutes pour vérifier la température
+  - platform: time_pattern
+    minutes: /1
+variables:
+  # Récupère la température d'il y a 5 minutes
+  temp_precedente: >
+    {% set temp = state_attr('sensor.capteur_d_humidite_temperature', 'last_changed') %}
+    {% set old_state = states.sensor.capteur_d_humidite_temperature.attributes.get('last_changed') - timedelta(minutes=5) %}
+    {{ float(states.sensor.capteur_d_humidite_temperature.state) }}
+  # Température actuelle
+  temp_actuelle: "{{ float(states('sensor.capteur_d_humidite_temperature')) }}"
+  # Calcul de la différence
+  difference: "{{ temp_actuelle - temp_precedente }}"
+condition:
+  # On vérifie uniquement si le radiateur est allumé
+  - condition: state
+    entity_id: switch.prise_radiateur_chambre
+    state: 'on'
+action:
+  - choose:
+      # Détection d'une chute de température
+      - conditions:
+          - condition: template
+            value_template: "{{ difference < -0.5 }}"
+          # On vérifie qu'on n'a pas déjà détecté une fenêtre ouverte
+          - condition: state
+            entity_id: input_boolean.fenetre_ouverte_detectee
+            state: 'off'
+        sequence:
+          # On marque la fenêtre comme ouverte
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.fenetre_ouverte_detectee
+          # On éteint le radiateur
+          - service: switch.turn_off
+            target:
+              entity_id: switch.prise_radiateur_chambre
+          # On envoie une notification
+          - service: notify.mobile_app_galaxy_s21_fe
+            data:
+              message: >
+                ❄️ Chute rapide de température détectée dans la chambre ({{ difference | round(1) }}°C en 5min).
+                Le chauffage a été coupé. Vérifiez si une fenêtre est ouverte.
+              title: "Fenêtre Ouverte Détectée"
+              data:
+                channel: "temperature_alerts"
+                importance: high
+                priority: high
+      # Détection de stabilisation de la température
+      - conditions:
+          - condition: template
+            value_template: "{{ difference > -0.1 and difference < 0.1 }}"
+          - condition: state
+            entity_id: input_boolean.fenetre_ouverte_detectee
+            state: 'on'
+        sequence:
+          # On marque la fenêtre comme fermée
+          - service: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.fenetre_ouverte_detectee
+          # On envoie une notification
+          - service: notify.mobile_app_galaxy_s21_fe
+            data:
+              message: >
+                ✅ La température s'est stabilisée dans la chambre.
+                Le chauffage va reprendre son fonctionnement normal.
+              title: "Température Stabilisée"
+              data:
+                channel: "temperature_alerts"
+                importance: high
+                priority: high
+mode: single

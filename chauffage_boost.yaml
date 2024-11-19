@@ -1,0 +1,46 @@
+alias: "Chambre - Mode Boost"
+description: "Gestion du mode boost pour le chauffage"
+trigger:
+  - platform: state
+    entity_id: input_boolean.boost_chauffage_chambre
+action:
+  - choose:
+      # Quand on active le boost
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.boost_chauffage_chambre
+            state: "on"
+        sequence:
+          - service: timer.start
+            target:
+              entity_id: timer.boost_chauffage_chambre
+          - service: switch.turn_on
+            target:
+              entity_id: switch.radiateur_prise_1
+
+      # Quand on désactive le boost
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.boost_chauffage_chambre
+            state: "off"
+        sequence:
+          - service: timer.cancel
+            target:
+              entity_id: timer.boost_chauffage_chambre
+          - service: switch.turn_off
+            target:
+              entity_id: switch.radiateur_prise_1
+
+  - service: notify.mobile_app_galaxy_s21_fe
+    data:
+      message: >
+        {% if is_state('input_boolean.boost_chauffage_chambre', 'on') %}
+          Mode Boost activé pour 30 minutes
+        {% else %}
+          Mode Boost désactivé
+        {% endif %}
+      title: Boost Chauffage
+      data:
+        channel: chauffage_boost
+
+mode: single

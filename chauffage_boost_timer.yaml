@@ -1,0 +1,22 @@
+alias: "Chambre - Fin Timer Boost"
+description: "Arrêt automatique du boost après 30 minutes"
+trigger:
+  - platform: event
+    event_type: timer.finished
+    event_data:
+      entity_id: timer.boost_chauffage_chambre
+action:
+  - service: input_boolean.turn_off
+    target:
+      entity_id: input_boolean.boost_chauffage_chambre
+  - service: switch.turn_off
+    target:
+      entity_id: switch.radiateur_prise_1
+  - service: notify.mobile_app_galaxy_s21_fe
+    data:
+      message: "Mode Boost terminé automatiquement"
+      title: Boost Chauffage
+      data:
+        channel: chauffage_boost
+
+mode: single

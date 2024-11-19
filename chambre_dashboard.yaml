@@ -1,0 +1,240 @@
+title: Chambre - Contrôle Température
+views:
+  - title: Vue Principale
+    path: main
+    icon: mdi:home-thermometer
+    cards:
+      # Carte d'état principal
+      - type: custom:mushroom-template-card
+        primary: Température Chambre
+        secondary: >-
+          {{ states('sensor.capteur_d_humidite_temperature') }}°C
+        icon: mdi:thermometer
+        icon_color: >-
+          {% set temp = states('sensor.capteur_d_humidite_temperature') | float %}
+          {% if temp < 17 %}
+            blue
+          {% elif temp > 20 %}
+            red
+          {% else %}
+            green
+          {% endif %}
+
+      # Carte Tempo
+      - type: custom:mushroom-template-card
+        primary: Tempo Aujourd'hui
+        secondary: >-
+          {% set color = states('sensor.rte_tempo_couleur_actuelle') %}
+          {{ color }} {% if color == 'ROUGE' %}🔴{% elif color == 'BLANC' %}⚪{% else %}🔵{% endif %}
+        icon: mdi:calendar-clock
+        icon_color: >-
+          {% set color = states('sensor.rte_tempo_couleur_actuelle') %}
+          {% if color == 'ROUGE' %}red{% elif color == 'BLANC' %}grey{% else %}blue{% endif %}
+
+      # Carte Tempo Demain
+      - type: custom:mushroom-template-card
+        primary: Tempo Demain
+        secondary: >-
+          {% set color = states('sensor.rte_tempo_prochaine_couleur') %}
+          {{ color }} {% if color == 'ROUGE' %}🔴{% elif color == 'BLANC' %}⚪{% else %}🔵{% endif %}
+        icon: mdi:calendar-arrow-right
+        icon_color: >-
+          {% set color = states('sensor.rte_tempo_prochaine_couleur') %}
+          {% if color == 'ROUGE' %}red{% elif color == 'BLANC' %}grey{% else %}blue{% endif %}
+
+      # État du Radiateur
+      - type: custom:mushroom-entity-card
+        entity: switch.radiateur_prise_1
+        name: Radiateur
+        icon: mdi:radiator
+        tap_action:
+          action: toggle
+
+      # Détection Fenêtre
+      - type: custom:mushroom-entity-card
+        entity: input_boolean.fenetre_ouverte_detectee
+        name: Fenêtre Ouverte
+        icon: mdi:window-open
+
+      # Switch Jours Rouges
+      - type: custom:mushroom-entity-card
+        entity: input_boolean.chauffage_chambre_active
+        name: Chauffage Jours Rouges
+        icon: mdi:radiator
+        tap_action:
+          action: toggle
+
+      # Mode Boost
+      - type: custom:mushroom-entity-card
+        entity: input_boolean.boost_chauffage_chambre
+        name: Mode Boost (30 min)
+        icon: mdi:radiator-off
+        tap_action:
+          action: toggle
+
+      # Timer Boost
+      - type: custom:mushroom-template-card
+        primary: État du Boost
+        secondary: >-
+          {% if is_state('timer.boost_chauffage_chambre', 'active') %}
+            Temps restant : {{ relative_time(states.timer.boost_chauffage_chambre.attributes.finishes_at) }}
+          {% else %}
+            Inactif
+          {% endif %}
+        icon: mdi:timer-outline
+        icon_color: >-
+          {% if is_state('timer.boost_chauffage_chambre', 'active') %}
+            orange
+          {% else %}
+            grey
+          {% endif %}
+
+      # Temps de chauffe
+      - type: custom:mushroom-template-card
+        primary: Temps de chauffe
+        secondary: >-
+          {% set hours = states('input_number.temps_chauffage_jour') | float %}
+          {{ hours | round(1) }} heures aujourd'hui
+        icon: mdi:clock-outline
+        icon_color: >-
+          {% set hours = states('input_number.temps_chauffage_jour') | float %}
+          {% if hours < 8 %}
+            green
+          {% elif hours < 12 %}
+            orange
+          {% else %}
+            red
+          {% endif %}
+
+      # Temps de chauffe hebdomadaire
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Temps de chauffe hebdomadaire
+        graph_span: 7d
+        span:
+          start: day
+        series:
+          - entity: input_number.temps_chauffage_jour
+            name: Heures de chauffe
+            type: column
+            group_by:
+              func: max
+              duration: 1d
+            stroke_width: 2
+            color: orange
+            show:
+              legend_value: false
+
+      # Estimation consommation
+      - type: custom:mushroom-template-card
+        primary: Consommation estimée
+        secondary: >-
+          {% set heures = states('input_number.temps_chauffage_jour') | float %}
+          {% set puissance = 1000 %}  # Puissance en watts
+          {% set kwh = (heures * puissance / 1000) | round(1) %}
+          {{ kwh }} kWh aujourd'hui
+        icon: mdi:flash
+        icon_color: >-
+          {% set heures = states('input_number.temps_chauffage_jour') | float %}
+          {% if heures < 8 %}
+            green
+          {% elif heures < 12 %}
+            orange
+          {% else %}
+            red
+          {% endif %}
+
+      # Comparaison Températures Intérieure/Extérieure
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Températures Int/Ext
+          show_states: true
+        graph_span: 24h
+        yaxis:
+          - id: temp
+            min: auto
+            max: auto
+            apex_config:
+              tickAmount: 5
+              decimalsInFloat: 1
+        series:
+          - entity: sensor.capteur_d_humidite_temperature
+            name: Intérieur
+            type: line
+            stroke_width: 2
+            curve: smooth
+            color: orange
+            yaxis_id: temp
+          - entity: sensor.weather_temperature
+            name: Extérieur
+            type: line
+            stroke_width: 2
+            curve: smooth
+            color: blue
+            yaxis_id: temp
+        apex_config:
+          chart:
+            height: 250
+          tooltip:
+            shared: true
+          legend:
+            position: top
+
+      # Analyse Impact Température Extérieure
+      - type: custom:mushroom-template-card
+        primary: Différence Int/Ext
+        secondary: >-
+          {% set temp_int = states('sensor.capteur_d_humidite_temperature') | float %}
+          {% set temp_ext = states('sensor.weather_temperature') | float %}
+          {% set diff = (temp_int - temp_ext) | round(1) %}
+          {{ diff }}°C d'écart
+        icon: mdi:thermometer-sync
+        icon_color: >-
+          {% set diff = (states('sensor.capteur_d_humidite_temperature') | float - states('sensor.weather_temperature') | float) | round(1) %}
+          {% if diff < 5 %}
+            red
+          {% elif diff < 10 %}
+            orange
+          {% else %}
+            green
+          {% endif %}
+
+      # Statistiques comparatives
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Comparaison des températures
+        graph_span: 24h
+        series:
+          - entity: sensor.capteur_d_humidite_temperature
+            name: Température actuelle
+            type: line
+            stroke_width: 2
+            curve: smooth
+            color: orange
+          - entity: sensor.capteur_d_humidite_temperature
+            name: Hier
+            type: line
+            stroke_width: 1
+            curve: smooth
+            color: grey
+            offset: -1d
+            show:
+              in_chart: true
+              legend_value: true
+
+      # Historique Radiateur
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Activité Radiateur
+        graph_span: 24h
+        all_series_config:
+          stroke_width: 2
+        series:
+          - entity: sensor.radiateur_etat
+            name: État
+            type: line
+

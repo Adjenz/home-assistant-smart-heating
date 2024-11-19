@@ -1,0 +1,25 @@
+input_boolean:
+  chauffage_chambre_active:
+    name: "Activer chauffage chambre jours rouges"
+    icon: mdi:radiator
+  fenetre_ouverte_detectee:
+    name: "Fenêtre Ouverte Détectée"
+    icon: mdi:window-open
+  boost_chauffage_chambre:
+    name: "Mode Boost 30min"
+    icon: mdi:radiator-off
+
+timer:
+  boost_chauffage_chambre:
+    name: "Timer Boost Chauffage"
+    duration: "00:30:00"
+    icon: mdi:timer-outline
+
+input_number:
+  temps_chauffage_jour:
+    name: "Temps de chauffe aujourd'hui"
+    min: 0
+    max: 24
+    step: 0.1
+    unit_of_measurement: "h"
+    icon: mdi:clock-outline

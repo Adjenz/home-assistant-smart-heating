@@ -1,0 +1,350 @@
+alias: "Chambre - Contrôle Température Tempo"
+description: "Gestion intelligente du radiateur selon tarification Tempo"
+trigger:
+  - platform: numeric_state
+    entity_id: sensor.capteur_d_humidite_temperature
+    below: 18.5
+  - platform: numeric_state
+    entity_id: sensor.capteur_d_humidite_temperature
+    above: 19.5
+  - platform: state
+    entity_id: sensor.rte_tempo_couleur_actuelle
+  - platform: time_pattern
+    hours: "/1"
+condition:
+  # Vérification que le capteur fonctionne
+  - condition: template
+    value_template: "{{ not is_state('sensor.capteur_d_humidite_temperature', 'unavailable') 
+                       and not is_state('sensor.capteur_d_humidite_temperature', 'unknown') }}"
+  # Vérification que l'automatisation n'est pas désactivée pendant les jours rouges
+  - condition: or
+    conditions:
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "ROUGE"
+      - condition: state
+        entity_id: input_boolean.chauffage_chambre_active
+        state: "on"
+action:
+  - choose:
+      # Gestion des jours ROUGES
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "ROUGE"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '22:00' and now().strftime('%H:%M')|string < '05:45' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            below: 19.0
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: switch.radiateur_prise_1
+          - service: notify.notify
+            data:
+              message: >
+                Radiateur allumé (Jour ROUGE - HC) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "ROUGE"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '22:00' and now().strftime('%H:%M')|string < '05:45' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            above: 20.0
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: switch.radiateur_prise_1
+          - service: notify.notify
+            data:
+              message: >
+                Radiateur éteint (Jour ROUGE - HC) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+
+      # Gestion des jours ROUGES en heures pleines
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "ROUGE"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '05:45' and now().strftime('%H:%M')|string < '22:00' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            below: 17.5
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: switch.radiateur_prise_1
+          - service: notify.notify
+            data:
+              message: >
+                Radiateur allumé (Jour ROUGE - HP) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "ROUGE"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '05:45' and now().strftime('%H:%M')|string < '22:00' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            above: 18.5
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: switch.radiateur_prise_1
+          - service: notify.notify
+            data:
+              message: >
+                Radiateur éteint (Jour ROUGE - HP) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+
+      # Gestion des jours ROUGES en heures pleines - période école
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "ROUGE"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '08:30' and now().strftime('%H:%M')|string < '16:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            below: 16.5
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: switch.prise_radiateur_chambre
+          - service: notify.mobile_app_galaxy_s21_fe
+            data:
+              message: >
+                Radiateur allumé (Jour ROUGE - École) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "ROUGE"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '08:30' and now().strftime('%H:%M')|string < '16:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            above: 17.5
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: switch.prise_radiateur_chambre
+          - service: notify.mobile_app_galaxy_s21_fe
+            data:
+              message: >
+                Radiateur éteint (Jour ROUGE - École) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+
+      # Gestion des jours BLANCS en heures creuses et préchauffe
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "BLANC"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '19:30' or now().strftime('%H:%M')|string < '07:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            below: 19.0
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: switch.radiateur_prise_1
+          - service: notify.notify
+            data:
+              message: >
+                Radiateur allumé (Jour BLANC - Préchauffe/HC) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "BLANC"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '19:30' or now().strftime('%H:%M')|string < '07:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            above: 19.5
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: switch.radiateur_prise_1
+          - service: notify.notify
+            data:
+              message: >
+                Radiateur éteint (Jour BLANC - Préchauffe/HC) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+
+      # Gestion des jours BLANCS - période école
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "BLANC"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '08:30' and now().strftime('%H:%M')|string < '16:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            below: 17.0
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: switch.prise_radiateur_chambre
+          - service: notify.mobile_app_galaxy_s21_fe
+            data:
+              message: >
+                Radiateur allumé (Jour BLANC - École) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "BLANC"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '08:30' and now().strftime('%H:%M')|string < '16:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            above: 18.0
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: switch.prise_radiateur_chambre
+          - service: notify.mobile_app_galaxy_s21_fe
+            data:
+              message: >
+                Radiateur éteint (Jour BLANC - École) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+
+      # Gestion des jours BLANCS en heures pleines
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "BLANC"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '07:30' and now().strftime('%H:%M')|string < '19:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            below: 18.0
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: switch.radiateur_prise_1
+          - service: notify.notify
+            data:
+              message: >
+                Radiateur allumé (Jour BLANC - HP) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "BLANC"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '07:30' and now().strftime('%H:%M')|string < '19:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            above: 19.0
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: switch.radiateur_prise_1
+          - service: notify.notify
+            data:
+              message: >
+                Radiateur éteint (Jour BLANC - HP) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+
+      # Gestion des jours BLEUS en heures creuses et préchauffe
+      - conditions:
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '19:30' or now().strftime('%H:%M')|string < '07:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            below: 19.0
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: switch.radiateur_prise_1
+          - service: notify.notify
+            data:
+              message: >
+                Radiateur allumé (Jour BLEU - Préchauffe/HC) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+      - conditions:
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '19:30' or now().strftime('%H:%M')|string < '07:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            above: 19.5
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: switch.radiateur_prise_1
+          - service: notify.notify
+            data:
+              message: >
+                Radiateur éteint (Jour BLEU - Préchauffe/HC) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+
+      # Gestion des jours BLEUS - période école
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "BLEU"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '08:30' and now().strftime('%H:%M')|string < '16:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            below: 17.5
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: switch.prise_radiateur_chambre
+          - service: notify.mobile_app_galaxy_s21_fe
+            data:
+              message: >
+                Radiateur allumé (Jour BLEU - École) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+      - conditions:
+          - condition: state
+            entity_id: sensor.rte_tempo_couleur_actuelle
+            state: "BLEU"
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '08:30' and now().strftime('%H:%M')|string < '16:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            above: 18.5
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: switch.prise_radiateur_chambre
+          - service: notify.mobile_app_galaxy_s21_fe
+            data:
+              message: >
+                Radiateur éteint (Jour BLEU - École) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+
+      # Gestion des jours BLEUS en heures pleines
+      - conditions:
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '07:30' and now().strftime('%H:%M')|string < '19:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            below: 18.5
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: switch.radiateur_prise_1
+          - service: notify.notify
+            data:
+              message: >
+                Radiateur allumé (Jour BLEU - HP) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+      - conditions:
+          - condition: template
+            value_template: "{{ now().strftime('%H:%M')|string >= '07:30' and now().strftime('%H:%M')|string < '19:30' }}"
+          - condition: numeric_state
+            entity_id: sensor.capteur_d_humidite_temperature
+            above: 19.5
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: switch.radiateur_prise_1
+          - service: notify.notify
+            data:
+              message: >
+                Radiateur éteint (Jour BLEU - HP) - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+    default:
+      - service: notify.notify
+        data:
+          message: >
+            État du radiateur inchangé - Temp: {{ states('sensor.capteur_d_humidite_temperature') }}°C
+            Jour {{ states('sensor.rte_tempo_couleur_actuelle') }}
+            {% if now().strftime('%H')|int >= 22 or now().strftime('%H')|int < 6 %}(Heures Creuses){% else %}(Heures Pleines){% endif %}
+mode: single

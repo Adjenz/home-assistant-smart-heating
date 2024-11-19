@@ -1,0 +1,35 @@
+alias: "Chambre - Compteur Chauffage"
+description: "Comptage du temps de fonctionnement du radiateur"
+trigger:
+  - platform: time_pattern
+    minutes: "/1"
+  - platform: time
+    at: "00:00:00"
+condition: []
+action:
+  - choose:
+      # Réinitialisation à minuit
+      - conditions:
+          - condition: time
+            after: "00:00:00"
+            before: "00:01:00"
+        sequence:
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.temps_chauffage_jour
+            data:
+              value: 0
+      # Incrémentation si le radiateur est allumé
+      - conditions:
+          - condition: state
+            entity_id: switch.radiateur_prise_1
+            state: "on"
+        sequence:
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.temps_chauffage_jour
+            data:
+              value: >
+                {% set current = states('input_number.temps_chauffage_jour') | float %}
+                {{ current + 0.0167 }}
+mode: single
